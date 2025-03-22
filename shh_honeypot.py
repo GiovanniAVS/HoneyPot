@@ -3,9 +3,12 @@ import logging
 from logging.handlers import RotatingFileHandler
 import socket
 import paramiko
+import threading
 
 # Constants
 logging_format = logging.Formatter('%(message)s')
+SSH_BANNER = "SSH-2.0-MySSHServer_1.0"
+host_key = 'server.key'
 
 # Loggers & Logging Files
 funnel_logger = logging.getLogger('FunnelLogger')
@@ -58,6 +61,7 @@ def emulated_shell(channel, client_ip):
 class Server(paramiko.ServerInterface):
 
     def __init__(self, client_ip, input_username=None, input_password=None):
+        self.event = threading.Event()
         self.client_ip = client_ip
         self.input_username = input_username
         self.input_password = input_password
@@ -88,7 +92,53 @@ class Server(paramiko.ServerInterface):
     def check_channel_exec_request(seld, channel, command):
         command = str(command)
         return True
+    
+def client_handle(client, addr, username, password):
+    client_ip = addr[0]
+    print(f'{client_ip} has connected to the server.')
+
+    try:
+        transport = paramiko.Transport()
+        transport.local_version == SSH_BANNER
+        server = Server(client_ip=client_ip, input_username=username, input_password=password)
+
+        transport.add_server_key(host_key)
+        transport.start_server(server=server)
+
+        channel = transport.accept(100)
+        if channel is None:
+            print("No channel was opened.")
+
+        standard_banner = "Welcome to Ubuntu 22.04 LTS (Jammy Jellyfish)!\r\n\r\n"
+        channel.send(standard_banner)
+        emulated_shell(channel, client_ip=client_ip)
+    except Exception as error:
+        print("Something went wrong!")
+        print(error)
+    finally:
+        try:
+            transport.close()
+        except Exception as error:
+            print("Something went wrong!")
+            print(error)
+
 
             
 
 # Provision SSH-based Honeypot
+
+def honeypot(address, port, username, password):
+    socks = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  #Listening to IPV4 using TCP port
+    socks.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    socks.bind((address, port))
+
+    socks.listen(100) # How many connections we can handle
+    print(f"SSH server is listening on port {port}.")
+
+    while True:
+        try:
+            client, addr = socks.accept()
+            ssh_honeypot_thread = threading.Thread(target=client_handle, args=(client, addr, username, password))
+            ssh_honeypot_thread.start()
+        except Exception as error:
+            print(error)
