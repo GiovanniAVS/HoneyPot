@@ -8,7 +8,8 @@ import threading
 # Constants
 logging_format = logging.Formatter('%(message)s')
 SSH_BANNER = "SSH-2.0-MySSHServer_1.0"
-host_key = 'server.key'
+#host_key = 'server.key'
+host_key = paramiko.RSAKey(filename='server.key')
 
 # Loggers & Logging Files
 funnel_logger = logging.getLogger('FunnelLogger')
@@ -40,7 +41,7 @@ def emulated_shell(channel, client_ip):
                 response = b'\n Goodbye!\n'
                 channel.close()
             elif command.strip() == b'pwd':
-                response = b'\n' + b'\\usr\local\\' + b'\r\n'
+                response = b'\n' + b'\\usr\\local\\' + b'\r\n'
             elif command.strip() == b'whoami':
                 response = b'\n' + b'corpuser1' + b'\r\n'
             elif command.strip() == b'ls':
@@ -50,10 +51,9 @@ def emulated_shell(channel, client_ip):
             # You can continue to add more commands
             else:
                 response = b'\n' + bytes(command.strip()) + b'\r\n'
-
-        channel.send(response)
-        channel.send(b'corporate-jumpbox2$ ')
-        command = b""
+            channel.send(response)
+            channel.send(b'corporate-jumpbox2$ ')
+            command = b""
 
 
 # SSH Server + Socket
@@ -72,33 +72,39 @@ class Server(paramiko.ServerInterface):
         
         #return paramiko.OPEN_FAILED
         
-    def get_allowed_auths(self):  #With SSH you can use basic auth with user and pass, public and private key criptography 
+    def get_allowed_auths(self, username):  #With SSH you can use basic auth with user and pass, public and private key criptography 
         return 'password'
     
     def check_auth_password(self, username, password):  #Can be improved using args to capture user input
+        print(f"Login attempt - Username: {username}, Password: {password}")
         if self.input_username is not None and self.input_password is not None:
-            if username == 'username' and password == 'password':
+            if username == self.input_username and password == self.input_password:
                 return paramiko.AUTH_SUCCESSFUL
             else:
                 return paramiko.AUTH_FAILED
+        else:
+            return paramiko.AUTH_SUCCESSFUL
     
     def check_channel_shell_request(self, channel):
+        print("Shell request received")
         self.event.set()
         return True
     
     def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
         return True
     
-    def check_channel_exec_request(seld, channel, command):
-        command = str(command)
-        return True
+    def check_channel_exec_request(self, kind: str, chanid: int) -> int:
+        if kind == 'session':
+            return paramiko.OPEN_SUCCEEDED
+        return paramiko.OPEN_FAILED
+
     
 def client_handle(client, addr, username, password):
     client_ip = addr[0]
     print(f'{client_ip} has connected to the server.')
 
     try:
-        transport = paramiko.Transport()
+        transport = paramiko.Transport(client)
         transport.local_version == SSH_BANNER
         server = Server(client_ip=client_ip, input_username=username, input_password=password)
 
@@ -106,6 +112,7 @@ def client_handle(client, addr, username, password):
         transport.start_server(server=server)
 
         channel = transport.accept(100)
+        print(f"Channel object: {channel}")
         if channel is None:
             print("No channel was opened.")
 
@@ -142,3 +149,5 @@ def honeypot(address, port, username, password):
             ssh_honeypot_thread.start()
         except Exception as error:
             print(error)
+
+honeypot('127.0.0.1', 2223, 'username', 'password')
