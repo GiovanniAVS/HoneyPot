@@ -1,6 +1,7 @@
 # Libraries
 import argparse
 from ssh_honeypot import *
+from web_honeypot import *
 
 # Parse Arguments
 
@@ -29,7 +30,13 @@ if __name__ == "__main__":
         elif args.http:
             print("[-] Running HTTP WordPress Honeypot...")
             
-            pass #Pass while the web honeypot is not implemented
+            if not args.username:
+                args.username = "admin"
+            if not args.password:
+                args.password = "password"
+            
+            print(f"Port: {args.port} Username: {args.username} Password {args.password}")
+            run_app(args.port, args.username, args.password)
         else:
             print("[!] Choose a valid honeypot type (SSH --ssh) or (HTTP --http).")
 
