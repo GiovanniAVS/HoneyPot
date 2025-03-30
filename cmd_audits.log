@@ -1,0 +1,6 @@
+Client 127.0.0.1 attempted connection with username: username, password: password
+127.0.0.1, username, password
+Client 127.0.0.1 attempted connection with username: username, password: teste
+127.0.0.1, username, teste
+Client 127.0.0.1 attempted connection with username: username, password: teste
+127.0.0.1, username, teste

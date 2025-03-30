@@ -38,16 +38,20 @@ def emulated_shell(channel, client_ip):
 
         if char == b'\r':   # Everytime you press ENTER the programm will evaluete this commands
             if command.strip() == b'exit':
-                response = b'\n Goodbye!\n'
+                response = b"\n Goodbye!\n"
                 channel.close()
             elif command.strip() == b'pwd':
-                response = b'\n' + b'\\usr\\local\\' + b'\r\n'
+                response = b"\n" + b"\\usr\\local" + b"\r\n"
+                creds_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
             elif command.strip() == b'whoami':
-                response = b'\n' + b'corpuser1' + b'\r\n'
+                response = b"\n" + b"corpuser1" + b"\r\n"
+                creds_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
             elif command.strip() == b'ls':
-                response = b'\n' + b'jumpbox1.conf' + b'\r\n'
+                response = b"\n" + b"jumpbox1.conf" + b"\r\n"
+                creds_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
             elif command.strip() == b'cat jumpbox1.conf':
-                response = b'\n' + b'Go to Sunday Mass' + b'\r\n'
+                response = b"\n" + b"Go to Sunday Mass" + b"\r\n"
+                creds_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
             # You can continue to add more commands
             else:
                 response = b'\n' + bytes(command.strip()) + b'\r\n'
@@ -76,7 +80,8 @@ class Server(paramiko.ServerInterface):
         return 'password'
     
     def check_auth_password(self, username, password):  #Can be improved using args to capture user input
-        print(f"Login attempt - Username: {username}, Password: {password}")
+        funnel_logger.info(f'Client {self.client_ip} attempted connection with username: {username}, password: {password}' )
+        creds_logger.info(f'{self.client_ip}, {username}, {password}')
         if self.input_username is not None and self.input_password is not None:
             if username == self.input_username and password == self.input_password:
                 return paramiko.AUTH_SUCCESSFUL
@@ -150,4 +155,4 @@ def honeypot(address, port, username, password):
         except Exception as error:
             print(error)
 
-honeypot('127.0.0.1', 2223, 'username', 'password')
+honeypot('127.0.0.1', 2223, username=None, password=None)
