@@ -4,23 +4,36 @@ from logging.handlers import RotatingFileHandler
 import socket
 import paramiko
 import threading
+import time
+from pathlib import Path
+
 
 # Constants
-logging_format = logging.Formatter('%(message)s')
 SSH_BANNER = "SSH-2.0-MySSHServer_1.0"
-#host_key = 'server.key'
-host_key = paramiko.RSAKey(filename='server.key')
+
+# Path Information
+base_dir = base_dir = Path(__file__).parent.parent # Get base directory of where user is running honeypy from.
+server_key = base_dir / 'ssh_honeypy' / 'static' / 'server.key' # Source creds_audits.log & cmd_audits.log file path.
+
+creds_audits_log_local_file_path = base_dir / 'ssh_honeypy' / 'log_files' / 'creds_audits.log'
+cmd_audits_log_local_file_path = base_dir / 'ssh_honeypy' / 'log_files' / 'cmd_audits.log'
+
+# Logging Format.
+logging_format = logging.Formatter('%(message)s')
+
+# SSH Server Host Key.
+host_key = paramiko.RSAKey(filename=server_key)
 
 # Loggers & Logging Files
 funnel_logger = logging.getLogger('FunnelLogger')
 funnel_logger.setLevel(logging.INFO)
-funnel_handler = RotatingFileHandler('audits.log', maxBytes=2000, backupCount=5)
+funnel_handler = RotatingFileHandler(cmd_audits_log_local_file_path, maxBytes=2000, backupCount=5)
 funnel_handler.setFormatter(logging_format)
 funnel_logger.addHandler(funnel_handler)
 
-creds_logger = logging.getLogger('FunnelLogger')
+creds_logger = logging.getLogger('CredsLogger')
 creds_logger.setLevel(logging.INFO)
-creds_handler = RotatingFileHandler('cmd_audits.log', maxBytes=2000, backupCount=5)
+creds_handler = RotatingFileHandler(creds_audits_log_local_file_path, maxBytes=2000, backupCount=5)
 creds_handler.setFormatter(logging_format)
 creds_logger.addHandler(creds_handler)
 
@@ -35,26 +48,27 @@ def emulated_shell(channel, client_ip):
             channel.close()
 
         command += char
-
+        # Emulate common shell commands.
         if char == b'\r':   # Everytime you press ENTER the programm will evaluete this commands
             if command.strip() == b'exit':
                 response = b"\n Goodbye!\n"
                 channel.close()
             elif command.strip() == b'pwd':
                 response = b"\n" + b"\\usr\\local" + b"\r\n"
-                creds_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
+                funnel_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
             elif command.strip() == b'whoami':
                 response = b"\n" + b"corpuser1" + b"\r\n"
-                creds_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
+                funnel_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
             elif command.strip() == b'ls':
                 response = b"\n" + b"jumpbox1.conf" + b"\r\n"
-                creds_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
+                funnel_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
             elif command.strip() == b'cat jumpbox1.conf':
                 response = b"\n" + b"Go to Sunday Mass" + b"\r\n"
-                creds_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
+                funnel_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
             # You can continue to add more commands
             else:
                 response = b'\n' + bytes(command.strip()) + b'\r\n'
+                funnel_logger.info(f'Command {command.strip()}' + "executed by " f'{client_ip}')
             channel.send(response)
             channel.send(b'corporate-jumpbox2$ ')
             command = b""
@@ -70,16 +84,14 @@ class Server(paramiko.ServerInterface):
         self.input_username = input_username
         self.input_password = input_password
 
-    def check_channel_exec_request(self, kind: str, chanid: int) -> int:
+    def check_channel_exec_request(self, kind, chanid):
         if kind == 'session':
             return paramiko.OPEN_SUCCEEDED
         
-        #return paramiko.OPEN_FAILED
-        
-    def get_allowed_auths(self, username):  #With SSH you can use basic auth with user and pass, public and private key criptography 
+    def get_allowed_auths(self, username):  # With SSH you can use basic auth with user and pass, public and private key criptography 
         return 'password'
     
-    def check_auth_password(self, username, password):  #Can be improved using args to capture user input
+    def check_auth_password(self, username, password): 
         funnel_logger.info(f'Client {self.client_ip} attempted connection with username: {username}, password: {password}' )
         creds_logger.info(f'{self.client_ip}, {username}, {password}')
         if self.input_username is not None and self.input_password is not None:
@@ -98,35 +110,56 @@ class Server(paramiko.ServerInterface):
     def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
         return True
     
-    def check_channel_exec_request(self, kind: str, chanid: int) -> int:
-        if kind == 'session':
-            return paramiko.OPEN_SUCCEEDED
-        return paramiko.OPEN_FAILED
+    def check_channel_exec_request(self, channel, command):
+        command = str(command)
+        return True
 
     
-def client_handle(client, addr, username, password):
+def client_handle(client, addr, username, password, tarpit=False):
     client_ip = addr[0]
     print(f'{client_ip} has connected to the server.')
 
     try:
+        # Initlizes a Transport object using the socket connection from client.
         transport = paramiko.Transport(client)
         transport.local_version == SSH_BANNER
-        server = Server(client_ip=client_ip, input_username=username, input_password=password)
 
+         # Creates an instance of the SSH server, adds the host key to prove its identity, starts SSH server.
+        server = Server(client_ip=client_ip, input_username=username, input_password=password)
         transport.add_server_key(host_key)
         transport.start_server(server=server)
 
+        # Establishes an encrypted tunnel for bidirectional communication between the client and server.
         channel = transport.accept(100)
         print(f"Channel object: {channel}")
+
         if channel is None:
             print("No channel was opened.")
 
         standard_banner = "Welcome to Ubuntu 22.04 LTS (Jammy Jellyfish)!\r\n\r\n"
-        channel.send(standard_banner)
-        emulated_shell(channel, client_ip=client_ip)
+        
+        try:
+            # Endless Banner: If tarpit option is passed, then send 'endless' ssh banner.
+            if tarpit:
+                endless_banner = standard_banner * 100
+                for char in endless_banner:
+                    channel.send(char)
+                    time.sleep(8)
+            # Standard Banner: Send generic welcome banner to impersonate server.
+            else:
+                channel.send(standard_banner)
+            # Send channel connection to emulated shell for interpretation.
+            emulated_shell(channel, client_ip=client_ip)
+
+        except Exception as error:
+            print(error)
+
+    # Generic catch all exception error code.
     except Exception as error:
         print("Something went wrong!")
         print(error)
+
+    # Once session has completed, close the transport connection.
     finally:
         try:
             transport.close()
@@ -134,12 +167,15 @@ def client_handle(client, addr, username, password):
             print("Something went wrong!")
             print(error)
 
+        client.close()
 
             
 
 # Provision SSH-based Honeypot
 
-def honeypot(address, port, username, password):
+def honeypot(address, port, username, password, tarpit=False):
+
+    # Open a new socket using TCP, bind to port.
     socks = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  #Listening to IPV4 using TCP port
     socks.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     socks.bind((address, port))
@@ -149,10 +185,15 @@ def honeypot(address, port, username, password):
 
     while True:
         try:
+            # Accept connection from client and address.
             client, addr = socks.accept()
+
+            # Start a new thread to handle the client connection
             ssh_honeypot_thread = threading.Thread(target=client_handle, args=(client, addr, username, password))
             ssh_honeypot_thread.start()
+
         except Exception as error:
+            print("Something went wrong!")
             print(error)
 
-honeypot('127.0.0.1', 2223, username=None, password=None)
+# honeypot('127.0.0.1', 2223, username=None, password=None)

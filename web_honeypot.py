@@ -7,10 +7,13 @@ from pathlib import Path
 # Logging Format.
 logging_format = logging.Formatter('%(asctime)s %(message)s')
 
+base_dir = base_dir = Path(__file__).parent.parent
+http_audits_log_local_file_path = base_dir / 'ssh_honeypy' / 'log_files' / 'http_audit.log'
+
 # HTTP Logger.
 funnel_logger = logging.getLogger('HTTPLogger')
 funnel_logger.setLevel(logging.INFO)
-funnel_handler = RotatingFileHandler('http_audits_log', maxBytes=2000, backupCount=5)
+funnel_handler = RotatingFileHandler(http_audits_log_local_file_path, maxBytes=2000, backupCount=5)
 funnel_handler.setFormatter(logging_format)
 funnel_logger.addHandler(funnel_handler)
 
@@ -35,7 +38,7 @@ def baseline_web_honeypot(input_username="admin", input_password="admin"):
         funnel_logger.info(f'Client with IP Address: {ip_address} entered\n Username: {username}, Password: {password}')
 
         if username == input_username and password == input_password:
-            return 'Please go to https://r.mtdv.me/gYVb1JYxGw'
+            return 'Please go to https://www.youtube.com/watch?v=dQw4w9WgXcQ'
         else:
             return "Invalid username or password, please try again."
         
