@@ -3,7 +3,7 @@ A modular, graphic-based honeypot to capture IP Adresses, usernames, passwords, 
 # Install
 
 **1) Clone repository.**
-`git clone https://github.com/collinsmc23/ssh_honeypy.git`
+`git clone https://github.com/GiovanniAVS/HoneyPot.git`
 
 **2) Permissions.**
 Move into `ssh_honeypy` folder.
@@ -83,13 +83,12 @@ The project started out with only supported SSH. Use the following instructions 
 ## HTTP
 Using Python Flask as a basic template to provision a simple web service, HONEYPY impersonates a default WordPress `wp-admin` login page. Username / password pairs are collected.
 
-There are default credentials accepted, `admin` and `deeboodah`, which will proceed to a Rick Roll gif. Username and password can be changed using the `-u / --username: Username.
+There are default credentials accepted, `admin` and `admin`, which will proceed to a Rick Roll gif. Username and password can be changed using the `-u / --username: Username.
 -w / --password: Password` arguments.
 
 The web-based honeypot runs on port 5000 by default. This can be changed using the `-p / --port` flag option.
 
-💡 There is currently not a dashboard panel supported for HTTP-based results. This will be a future addition.
-
+💡 There is currently not a dashboard panel supported for HTTP-based results.
 # Dashboard
 
 HONEYPY comes packaged with a `web_app.py` file. This can be run in a seperate terminal session on localhost to view statistics such as top 10 IP addresses, usernames, passwords, commands, and all data in tabular format. As of right now, the dashboards do not dynamically update as new entries or information are added to the log files. The dashboard must be run every time to re-populate to the most up-to-date information.
@@ -102,14 +101,10 @@ Run `python3 web_app.py` on localhost. Default port for Python Dash is `8050`. `
 
 HONEPY leverages Python Dash to populate the bar charts, Dash Bootstrap Components for dark-theme and style of charts, and Pandas for data parsing.
 
-<img src="/assets/images/Dashboard.PNG" alt="Dashboard" width="600"/>
-
 # VPS Hosting (General Tips)
 To host on VPS, follow the general tips.
 
 To gather logging information, it's advised to use a Virtual Private Server (VPS). VPS's are cloud-based hosts with Internet access. This provides a safe, isolated way to gather real-time information without having to configure and isolate infrastructure on your home network.
-
-You can get 10% off Hostinger VPS with this code (not sponsored on this GitHub project): https://www.hostinger.com/grantcollins
 
 A majority of VPS hosting providers will provide a Virtual Firewall where you can open ports. Ensure to open ports used by HONEYPY.
 - `Port 80`, `Port 5000`, `Port 2223` (Whichever port you configure to listen on real SSH connection), `Port 8050`. 
